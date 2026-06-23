@@ -4,6 +4,7 @@ import { stripAnsi } from "../../packages/terminal-core/src/ansi.js";
 import type { CommitmentRecord } from "../commitments/types.js";
 import type { OutputRuntimeEnv } from "../runtime.js";
 import { commitmentsDismissCommand, commitmentsListCommand } from "./commitments.js";
+import { testing } from "./commitments.js";
 
 const mocks = vi.hoisted(() => ({
   listCommitments: vi.fn(),
@@ -138,5 +139,42 @@ describe("commitments command", () => {
       status: "dismissed",
       nowMs: expect.any(Number),
     });
+  });
+});
+
+describe("truncate helper", () => {
+  const { truncate } = testing;
+
+  it("returns unchanged value when within maxChars", () => {
+    expect(truncate("short", 10)).toBe("short");
+    expect(truncate("exactly16chars!", 16)).toBe("exactly16chars!");
+  });
+
+  it("truncates with single-character ellipsis (…) to exactly maxChars width", () => {
+    // Test that truncated values are exactly maxChars wide
+    const result1 = truncate("this is a very long string", 10);
+    expect(result1).toBe("this is a…");
+    expect(result1.length).toBe(10);
+
+    const result2 = truncate("abcdefghijklmnopq", 16); // 17 chars, will be truncated
+    expect(result2).toBe("abcdefghijklmno…");
+    expect(result2.length).toBe(16);
+
+    const result3 = truncate("scope_is_too_long_for_column_extra", 28);
+    expect(result3).toBe("scope_is_too_long_for_colum…");
+    expect(result3.length).toBe(28);
+  });
+
+  it("handles edge case of maxChars=1", () => {
+    expect(truncate("long", 1)).toBe("…");
+    expect(truncate("long", 1).length).toBe(1);
+  });
+
+  it("matches behavior in flows.ts, tasks.ts, and onboard-skills.ts", () => {
+    // Verify we use the same single-character ellipsis as other commands
+    const expectedEllipsis = "…"; // U+2026 HORIZONTAL ELLIPSIS
+    const result = truncate("verylongstring", 10);
+    expect(result.endsWith(expectedEllipsis)).toBe(true);
+    expect(result.length).toBe(10);
   });
 });
